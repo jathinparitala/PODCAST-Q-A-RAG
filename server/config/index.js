@@ -12,10 +12,12 @@ const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   isDev: (process.env.NODE_ENV || 'development') === 'development',
 
-  // Database
-  dbPath: process.env.DB_PATH
-    ? path.resolve(__dirname, '..', process.env.DB_PATH)
-    : path.resolve(__dirname, '..', 'database', 'podcast_qa.db'),
+  // Database (uses /tmp/podcast_qa.db on Vercel Serverless environment)
+  dbPath: process.env.VERCEL
+    ? path.join('/tmp', 'podcast_qa.db')
+    : (process.env.DB_PATH
+      ? path.resolve(__dirname, '..', process.env.DB_PATH)
+      : path.resolve(__dirname, '..', 'database', 'podcast_qa.db')),
 
   // CORS
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',

@@ -1,8 +1,11 @@
 {
   "name": "podcast-transcript-qa-rag",
   "version": "1.0.0",
-  "description": "AI-powered Podcast Transcript Q&A with Retrieval-Augmented Generation",
+  "description": "AI-powered Podcast Transcript & PDF Q&A with Retrieval-Augmented Generation",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "workspaces": [
     "client",
     "server"
@@ -13,9 +16,9 @@
     "client": "npm --prefix client run dev",
     "install:all": "npm install",
     "build": "npm --prefix client run build",
-    "start": "npm --prefix server start"
+    "start": "node server/index.js"
   },
-  "devDependencies": {
+  "dependencies": {
     "concurrently": "^8.2.2"
   }
 }
