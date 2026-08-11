@@ -15,7 +15,7 @@
     "server": "npm --prefix server run dev",
     "client": "npm --prefix client run dev",
     "install:all": "npm install",
-    "build": "npm --prefix client run build",
+    "build": "npm run build --workspace=client",
     "start": "node server/index.js"
   },
   "dependencies": {
