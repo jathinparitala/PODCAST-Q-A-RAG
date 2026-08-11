@@ -4,12 +4,52 @@
  * page-aware chunking, vector embedding generation, and DB persistence.
  */
 
-const pdfParse = require('pdf-parse');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 const db = require('../database/db');
 const logger = require('../utils/logger');
 const { createError } = require('../utils/errors');
+
+let pdfParse = null;
+
+function ensurePdfParserEnvironment() {
+  if (typeof global.DOMMatrix === 'undefined') {
+    global.DOMMatrix = class DOMMatrix {
+      constructor() {}
+    };
+  }
+
+  if (typeof global.ImageData === 'undefined') {
+    global.ImageData = class ImageData {
+      constructor(data, width, height) {
+        this.data = data;
+        this.width = width;
+        this.height = height;
+      }
+    };
+  }
+
+  if (typeof global.Path2D === 'undefined') {
+    global.Path2D = class Path2D {
+      constructor(path) {
+        this.path = path;
+      }
+    };
+  }
+}
+
+function loadPdfParse() {
+  if (!pdfParse) {
+    ensurePdfParserEnvironment();
+    try {
+      pdfParse = require('pdf-parse');
+    } catch (err) {
+      logger.error('Failed to load pdf-parse module:', err.message);
+      throw createError('PDF processing is unavailable in this deployment environment.', 500);
+    }
+  }
+  return pdfParse;
+}
 
 const pdfService = {
   /**
@@ -48,7 +88,9 @@ const pdfService = {
   deleteDocument(id, userId) {
     const doc = db.get('SELECT id FROM documents WHERE id = ? AND user_id = ?', [id, userId]);
     if (!doc) {
-      throw createError('Document not found', 404);
+      const error = new Error('Document not found');
+      error.statusCode = 404;
+      throw error;
     }
 
     db.run('DELETE FROM documents WHERE id = ?', [id]);
@@ -71,27 +113,23 @@ const pdfService = {
   /**
    * Full PDF Ingestion Pipeline:
    * Read PDF → Page-by-Page Extraction → Scanned PDF Check → Page-Aware Chunking → Embedding → DB
-   *
-   * @param {string} documentId
-   * @param {Buffer} fileBuffer
-   * @param {object} embeddingService
    */
   async processPdfDocument(documentId, fileBuffer, embeddingService) {
     try {
       this.updateDocumentStatus(documentId, 'processing');
 
       const doc = this.getDocumentById(documentId);
-      if (!doc) throw createError('Document record not found.', 404);
+      if (!doc) throw new Error('Document record not found.');
 
       // 1. Clean existing data if re-processing
       db.run('DELETE FROM document_pages WHERE document_id = ?', [documentId]);
       db.run('DELETE FROM document_chunks WHERE document_id = ?', [documentId]);
 
-      // 2. Page-by-page text extraction using pdf-parse
+      // 2. Page-by-page text extraction
       const extractedPages = await this.extractPdfPages(fileBuffer);
 
       if (!extractedPages || extractedPages.pages.length === 0) {
-        throw createError('Failed to extract pages from PDF.', 500);
+        throw new Error('Failed to extract pages from PDF.');
       }
 
       // Calculate total extracted text length
@@ -101,7 +139,7 @@ const pdfService = {
       if (totalText.length < 20) {
         const scanError = 'This PDF appears to be scanned or contains no extractable text.';
         this.updateDocumentStatus(documentId, 'failed', extractedPages.pages.length, scanError);
-        throw createError(scanError, 422);
+        throw new Error(scanError);
       }
 
       // 3. Persist document pages
@@ -151,42 +189,61 @@ const pdfService = {
   },
 
   /**
-   * Extract page-by-page text from PDF Buffer
+   * Extract page-by-page text from PDF Buffer (v1 & v2 compatible)
    */
   async extractPdfPages(fileBuffer) {
+    const pdfModule = loadPdfParse();
     const pages = [];
-    const options = {
-      pagerender: async function (pageData) {
-        try {
-          const textContent = await pageData.getTextContent();
-          let lastY, text = '';
-          for (const item of textContent.items) {
-            if (lastY === item.transform[5] || !lastY) {
-              text += item.str + ' ';
-            } else {
-              text += '\n' + item.str + ' ';
+
+    // Case A: pdf-parse v1 (Function signature: pdfParse(buffer, options))
+    if (typeof pdfModule === 'function') {
+      const options = {
+        pagerender: async function (pageData) {
+          try {
+            const textContent = await pageData.getTextContent();
+            let lastY, text = '';
+            for (const item of textContent.items) {
+              if (lastY === item.transform[5] || !lastY) {
+                text += item.str + ' ';
+              } else {
+                text += '\n' + item.str + ' ';
+              }
+              lastY = item.transform[5];
             }
-            lastY = item.transform[5];
+            const cleanPageText = text.replace(/\s+/g, ' ').replace(/\0/g, '').trim();
+            const pageNum = pageData.pageIndex + 1;
+            pages.push({ pageNumber: pageNum, text: cleanPageText });
+            return cleanPageText;
+          } catch (pageErr) {
+            return '';
           }
+        }
+      };
 
-          const cleanPageText = text
-            .replace(/\s+/g, ' ')
-            .replace(/\0/g, '')
-            .trim();
+      const parsed = await pdfModule(fileBuffer, options);
+      pages.sort((a, b) => a.pageNumber - b.pageNumber);
+      return { numPages: parsed.numpages || pages.length, pages };
+    }
 
-          const pageNum = pageData.pageIndex + 1;
-          pages.push({ pageNumber: pageNum, text: cleanPageText });
-          return cleanPageText;
-        } catch (pageErr) {
-          return '';
+    // Case B: pdf-parse v2+ (Object / Class signature: new PDFParse({ data: buffer }))
+    const PDFParseClass = pdfModule.PDFParse || pdfModule.default || pdfModule;
+    if (typeof PDFParseClass === 'function') {
+      const parser = new PDFParseClass({ data: fileBuffer });
+      const result = await parser.getText();
+
+      if (result && Array.isArray(result.pages)) {
+        for (const p of result.pages) {
+          const cleanText = (p.text || '').replace(/\s+/g, ' ').replace(/\0/g, '').trim();
+          pages.push({
+            pageNumber: p.num || p.pageNumber || (pages.length + 1),
+            text: cleanText,
+          });
         }
       }
-    };
+      return { numPages: result.total || pages.length, pages };
+    }
 
-    const parsed = await pdfParse(fileBuffer, options);
-    // Sort by page number
-    pages.sort((a, b) => a.pageNumber - b.pageNumber);
-    return { numPages: parsed.numpages || pages.length, pages };
+    throw new Error('PDF parser module format is unrecognized');
   },
 
   /**
@@ -208,7 +265,6 @@ const pdfService = {
           sectionHeading: `Page ${page.pageNumber}`,
         });
       } else {
-        // Split page text into overlapping windows
         let i = 0;
         let chunkIdx = 1;
         while (i < words.length) {

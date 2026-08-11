@@ -3,11 +3,12 @@
  * Cross-platform, fast, and standalone. Automatically persists to disk.
  */
 
-const initSqlJs = require('sql.js');
 const path = require('path');
 const fs = require('fs');
 const logger = require('../utils/logger');
 const config = require('../config');
+
+const initSqlJs = require('sql.js/dist/sql-wasm.js');
 
 let dbInstance = null;
 let SQLInstance = null;
@@ -32,7 +33,9 @@ async function initDatabase() {
   if (dbInstance) return dbInstance;
 
   if (!SQLInstance) {
-    SQLInstance = await initSqlJs();
+    SQLInstance = await initSqlJs({
+      locateFile: file => path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', file)
+    });
   }
 
   const dbPath = config.dbPath;

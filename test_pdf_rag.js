@@ -83,11 +83,15 @@ async function runPdfTests() {
   let user = db.get("SELECT * FROM users WHERE email = 'demo@podcastqa.com'");
   if (!user) {
     try {
-      const uRes = authService.registerUser({ email: 'demo@podcastqa.com', password: 'Password123!', name: 'Demo User' });
+      const uRes = await authService.registerUser({ email: 'demo@podcastqa.com', password: 'Password123!', name: 'Demo User' });
       user = uRes.user;
     } catch (e) {
       user = db.get("SELECT * FROM users LIMIT 1");
     }
+  }
+
+  if (!user) {
+    throw new Error('Could not resolve user for test');
   }
 
   console.log(`✓ Test user resolved: ${user.email} (ID: ${user.id})`);
