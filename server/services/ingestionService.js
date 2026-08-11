@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const db = require('../database/db');
 const logger = require('../utils/logger');
 const podcastService = require('./podcastService');
+const { createError } = require('../utils/errors');
 
 const ingestionService = {
   /**
@@ -28,7 +29,7 @@ const ingestionService = {
       const segments = this.parseTranscript(rawContent, detectedFormat);
 
       if (!segments || segments.length === 0) {
-        throw new Error('No transcript segments could be parsed from the provided content.');
+        throw createError('No transcript segments could be parsed from the provided content.', 422);
       }
 
       // Store format on episode

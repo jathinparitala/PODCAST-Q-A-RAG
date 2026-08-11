@@ -9,6 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 const db = require('../database/db');
 const logger = require('../utils/logger');
+const { createError } = require('../utils/errors');
 
 const pdfService = {
   /**
@@ -47,9 +48,7 @@ const pdfService = {
   deleteDocument(id, userId) {
     const doc = db.get('SELECT id FROM documents WHERE id = ? AND user_id = ?', [id, userId]);
     if (!doc) {
-      const error = new Error('Document not found');
-      error.statusCode = 404;
-      throw error;
+      throw createError('Document not found', 404);
     }
 
     db.run('DELETE FROM documents WHERE id = ?', [id]);
@@ -82,7 +81,7 @@ const pdfService = {
       this.updateDocumentStatus(documentId, 'processing');
 
       const doc = this.getDocumentById(documentId);
-      if (!doc) throw new Error('Document record not found.');
+      if (!doc) throw createError('Document record not found.', 404);
 
       // 1. Clean existing data if re-processing
       db.run('DELETE FROM document_pages WHERE document_id = ?', [documentId]);
@@ -92,7 +91,7 @@ const pdfService = {
       const extractedPages = await this.extractPdfPages(fileBuffer);
 
       if (!extractedPages || extractedPages.pages.length === 0) {
-        throw new Error('Failed to extract pages from PDF.');
+        throw createError('Failed to extract pages from PDF.', 500);
       }
 
       // Calculate total extracted text length
@@ -102,7 +101,7 @@ const pdfService = {
       if (totalText.length < 20) {
         const scanError = 'This PDF appears to be scanned or contains no extractable text.';
         this.updateDocumentStatus(documentId, 'failed', extractedPages.pages.length, scanError);
-        throw new Error(scanError);
+        throw createError(scanError, 422);
       }
 
       // 3. Persist document pages

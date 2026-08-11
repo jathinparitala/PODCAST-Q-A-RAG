@@ -6,6 +6,7 @@
 
 const crypto = require('crypto');
 const logger = require('../utils/logger');
+const { createError } = require('../utils/errors');
 
 const embeddingService = {
   /**
@@ -15,7 +16,7 @@ const embeddingService = {
    */
   async generateEmbedding(text) {
     if (!text || typeof text !== 'string' || !text.trim()) {
-      throw new Error('Cannot generate embedding for empty text');
+      throw createError('Cannot generate embedding for empty text', 400);
     }
     return this._localEmbed(text.trim());
   },

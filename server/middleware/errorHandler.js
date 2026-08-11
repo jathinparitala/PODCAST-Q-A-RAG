@@ -10,10 +10,11 @@ const logger = require('../utils/logger');
  */
 function errorHandler(err, req, res, _next) {
   const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
+  const message = err.isOperational ? err.message : 'Internal Server Error';
 
-  logger.error(`[${req.method}] ${req.originalUrl} — ${message}`, {
+  logger.error(`[${req.method}] ${req.originalUrl} — ${err.message}`, {
     statusCode,
+    operational: Boolean(err.isOperational),
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 
@@ -26,16 +27,4 @@ function errorHandler(err, req, res, _next) {
   });
 }
 
-/**
- * Creates an operational error with a status code.
- * @param {string} message
- * @param {number} statusCode
- * @returns {Error}
- */
-function createError(message, statusCode = 400) {
-  const error = new Error(message);
-  error.statusCode = statusCode;
-  return error;
-}
-
-module.exports = { errorHandler, createError };
+module.exports = { errorHandler };

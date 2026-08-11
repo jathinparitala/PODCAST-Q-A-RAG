@@ -3,13 +3,17 @@
   "version": "1.0.0",
   "description": "AI-powered Podcast Transcript Q&A with Retrieval-Augmented Generation",
   "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
     "dev": "node node_modules/concurrently/dist/bin/concurrently.js \"npm run server\" \"npm run client\"",
-    "server": "cd server && npm run dev",
-    "client": "cd client && npm run dev",
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
-    "build": "cd client && node node_modules/vite/bin/vite.js build",
-    "start": "cd server && npm start"
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "install:all": "npm install",
+    "build": "npm --prefix client run build",
+    "start": "npm --prefix server start"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

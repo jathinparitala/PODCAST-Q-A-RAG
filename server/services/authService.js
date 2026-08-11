@@ -10,6 +10,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const config = require('../config');
 const logger = require('../utils/logger');
+const { createError } = require('../utils/errors');
 
 const authService = {
   /**
@@ -47,16 +48,12 @@ const authService = {
   async registerUser({ email, password, name }) {
     const existing = db.get('SELECT id FROM users WHERE LOWER(email) = LOWER(?)', [email]);
     if (existing) {
-      const error = new Error('An account with this email address already exists');
-      error.statusCode = 400;
-      throw error;
+      throw createError('An account with this email address already exists', 400);
     }
 
     const strength = this.validatePasswordStrength(password);
     if (!strength.valid) {
-      const error = new Error('Password does not meet security requirements');
-      error.statusCode = 400;
-      throw error;
+      throw createError('Password does not meet security requirements', 400);
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -88,8 +85,7 @@ const authService = {
     const userRow = db.get('SELECT * FROM users WHERE LOWER(email) = LOWER(?)', [email]);
     
     // Generic error message to prevent account enumeration
-    const invalidError = new Error('Invalid email or password');
-    invalidError.statusCode = 401;
+    const invalidError = createError('Invalid email or password', 401);
 
     if (!userRow) {
       throw invalidError;
@@ -141,9 +137,7 @@ const authService = {
   verifyEmail(token) {
     const user = db.get('SELECT id FROM users WHERE verification_token = ?', [token]);
     if (!user) {
-      const error = new Error('Invalid or expired verification token');
-      error.statusCode = 400;
-      throw error;
+      throw createError('Invalid or expired verification token', 400);
     }
 
     db.run('UPDATE users SET is_verified = 1, verification_token = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
@@ -179,9 +173,7 @@ const authService = {
   async resetPassword({ token, newPassword }) {
     const strength = this.validatePasswordStrength(newPassword);
     if (!strength.valid) {
-      const error = new Error('New password does not meet strength requirements');
-      error.statusCode = 400;
-      throw error;
+      throw createError('New password does not meet strength requirements', 400);
     }
 
     const activeTokens = db.all('SELECT * FROM password_reset_tokens WHERE used = 0 AND expires_at > CURRENT_TIMESTAMP');
@@ -196,9 +188,7 @@ const authService = {
     }
 
     if (!matchedTokenRecord) {
-      const error = new Error('Password reset link is invalid or has expired');
-      error.statusCode = 400;
-      throw error;
+      throw createError('Password reset link is invalid or has expired', 400);
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -235,23 +225,17 @@ const authService = {
   async changePassword(userId, { currentPassword, newPassword }) {
     const userRow = db.get('SELECT password_hash FROM users WHERE id = ?', [userId]);
     if (!userRow) {
-      const error = new Error('User not found');
-      error.statusCode = 404;
-      throw error;
+      throw createError('User not found', 404);
     }
 
     const isMatch = await bcrypt.compare(currentPassword, userRow.password_hash);
     if (!isMatch) {
-      const error = new Error('Current password is incorrect');
-      error.statusCode = 400;
-      throw error;
+      throw createError('Current password is incorrect', 400);
     }
 
     const strength = this.validatePasswordStrength(newPassword);
     if (!strength.valid) {
-      const error = new Error('New password does not meet strength requirements');
-      error.statusCode = 400;
-      throw error;
+      throw createError('New password does not meet strength requirements', 400);
     }
 
     const salt = await bcrypt.genSalt(10);

@@ -6,6 +6,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const logger = require('../utils/logger');
+const { createError } = require('../utils/errors');
 
 const conversationService = {
   /**
@@ -160,9 +161,7 @@ const conversationService = {
   deleteConversation(id, userId) {
     const conv = db.get('SELECT id FROM conversations WHERE id = ? AND user_id = ?', [id, userId]);
     if (!conv) {
-      const error = new Error('Conversation not found');
-      error.statusCode = 404;
-      throw error;
+      throw createError('Conversation not found', 404);
     }
 
     db.run('DELETE FROM conversations WHERE id = ?', [id]);

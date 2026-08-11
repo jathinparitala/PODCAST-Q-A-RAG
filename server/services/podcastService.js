@@ -6,6 +6,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const logger = require('../utils/logger');
+const { createError } = require('../utils/errors');
 
 const podcastService = {
   // ─── Podcasts ──────────────────────────────────────────────────────────────
@@ -101,9 +102,7 @@ Speaker 2: The future of AI will likely involve systems that combine language mo
   updatePodcast(id, userId, { title, description, publisher, coverImageUrl }) {
     const existing = db.get('SELECT id FROM podcasts WHERE id = ? AND user_id = ?', [id, userId]);
     if (!existing) {
-      const error = new Error('Podcast not found');
-      error.statusCode = 404;
-      throw error;
+      throw createError('Podcast not found', 404);
     }
 
     const updates = [];
@@ -141,9 +140,7 @@ Speaker 2: The future of AI will likely involve systems that combine language mo
     // Verify podcast ownership
     const podcast = db.get('SELECT id FROM podcasts WHERE id = ? AND user_id = ?', [podcastId, userId]);
     if (!podcast) {
-      const error = new Error('Podcast not found');
-      error.statusCode = 404;
-      throw error;
+      throw createError('Podcast not found', 404);
     }
 
     const id = uuidv4();
