@@ -1,0 +1,120 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-heading: 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
+    --font-body: 'Inter', -apple-system, sans-serif;
+  }
+
+  html, body {
+    font-family: var(--font-body);
+    background-color: #f8fafc;
+    color: #0f172a;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .dark html, .dark body {
+    background-color: #0b0f19;
+    color: #f1f5f9;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+/* Typography Tokens */
+.font-display {
+  font-family: var(--font-heading);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.font-h1 {
+  font-family: var(--font-heading);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+.font-h2 {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.font-h3 {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.font-body {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.font-small {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.4s infinite;
+}
