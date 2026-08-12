@@ -8,7 +8,7 @@ import { audioService } from '../../../utils/audio';
 
 // ─── CitationChip ─────────────────────────────────────────────────────────────
 const CitationChip: React.FC<{ citation: Citation; index: number; onClick: () => void }> = ({ citation, index, onClick }) => {
-  const isPdf = Boolean(citation.documentId || citation.documentName || citation.pageNumber);
+  const isPdf = Boolean(citation.documentId || citation.documentName || citation.pageNumber || citation.sourceType === 'pdf');
 
   const formatTime = (s?: number) => {
     if (s === undefined || s === null) return '00:00';
@@ -18,19 +18,18 @@ const CitationChip: React.FC<{ citation: Citation; index: number; onClick: () =>
 
   return (
     <button onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-50 dark:bg-brand-950/50 border border-brand-200 dark:border-brand-800 rounded-md text-xs font-medium text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-900/50 transition-colors group">
-      <FileText className="w-3 h-3" />
-      <span>Source {index + 1}</span>
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 dark:bg-brand-950/60 border border-brand-200/80 dark:border-brand-800 rounded-lg text-xs font-medium text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-900/60 transition-colors group shadow-2xs">
+      <FileText className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400 shrink-0" />
       {isPdf ? (
-        <span className="text-brand-600 dark:text-brand-400 font-mono">
-          {citation.documentName ? citation.documentName : 'PDF'} • Page {citation.pageNumber || 1}
+        <span className="font-sans">
+          Source: PDF — <strong className="font-semibold">{citation.documentName || 'Document'}</strong>, Page {citation.pageNumber || 1}
         </span>
       ) : (
-        <span className="text-brand-500 dark:text-brand-400 font-mono">
-          {formatTime(citation.startTime)} – {formatTime(citation.endTime)}
+        <span className="font-sans">
+          Source: Episode — <strong className="font-semibold">{citation.episodeTitle || 'Podcast Episode'}</strong>, {formatTime(citation.startTime)}–{formatTime(citation.endTime)}
         </span>
       )}
-      <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ml-0.5 shrink-0 text-brand-500" />
     </button>
   );
 };

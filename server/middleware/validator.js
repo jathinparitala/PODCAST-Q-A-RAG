@@ -11,10 +11,11 @@ const { body, query, param, validationResult } = require('express-validator');
 function handleValidationErrors(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const errorDetails = errors.array().map((e) => `${e.path}: ${e.msg}`).join('; ');
     return res.status(400).json({
       success: false,
       error: {
-        message: 'Validation failed',
+        message: `RAG API Validation Error: ${errorDetails}`,
         details: errors.array().map((e) => ({
           field: e.path,
           message: e.msg,
@@ -69,8 +70,7 @@ const validateCreateEpisode = [
     .withMessage('Description must not exceed 5000 characters'),
   body('duration')
     .optional()
-    .isInt({ min: 0 })
-    .withMessage('Duration must be a positive integer (seconds)'),
+    .customSanitizer(val => parseInt(val, 10) || 0),
   body('audioUrl')
     .optional()
     .trim()
@@ -110,15 +110,20 @@ const validateSendMessage = [
 
 const validateCreateConversation = [
   body('episodeId')
-    .optional()
+    .optional({ checkFalsy: true, nullable: true })
     .trim()
     .isUUID()
     .withMessage('Invalid episode ID format'),
-  body('scope')
-    .optional()
+  body('documentId')
+    .optional({ checkFalsy: true, nullable: true })
     .trim()
-    .isIn(['episode', 'library'])
-    .withMessage('Scope must be either "episode" or "library"'),
+    .isUUID()
+    .withMessage('Invalid document ID format'),
+  body('scope')
+    .optional({ checkFalsy: true, nullable: true })
+    .trim()
+    .isIn(['episode', 'document', 'library'])
+    .withMessage('Scope must be one of: "episode", "document", or "library"'),
   handleValidationErrors,
 ];
 

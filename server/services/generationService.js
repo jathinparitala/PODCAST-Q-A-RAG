@@ -25,7 +25,7 @@ function getGenAIClient() {
   return genAI;
 }
 
-const NOT_FOUND_MSG = "I couldn't find enough information in the uploaded document to answer this question.";
+const NOT_FOUND_MSG = "I couldn't find this information in the uploaded documents or transcripts.";
 
 const generationService = {
   /**

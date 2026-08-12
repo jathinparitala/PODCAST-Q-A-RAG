@@ -224,4 +224,8 @@ export const api = {
   // User
   updateProfile: (body: any) => request<{ success: boolean; user: User }>('/user/profile', { method: 'PUT', body: JSON.stringify(body) }),
   updatePassword: (body: any) => request<{ success: boolean }>('/user/password', { method: 'PUT', body: JSON.stringify(body) }),
+
+  // Global Search
+  searchGlobal: (query: string) =>
+    request<{ success: boolean; query: string; results: { podcasts: any[]; episodes: any[]; documents: any[]; transcripts: any[]; pdfChunks: any[] } }>(`/search?q=${encodeURIComponent(query)}`),
 };

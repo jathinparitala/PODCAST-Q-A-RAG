@@ -23,6 +23,7 @@ const episodeRoutes = require('./routes/episodes');
 const conversationRoutes = require('./routes/conversations');
 const documentRoutes = require('./routes/documents');
 const userRoutes = require('./routes/user');
+const searchRoutes = require('./routes/search');
 
 const app = express();
 
@@ -79,6 +80,7 @@ app.use('/api/episodes', episodeRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/search', searchRoutes);
 
 // Production Static File Serving (for Render / Docker / standalone Node)
 const clientDistPath = path.resolve(__dirname, '../client/dist');
