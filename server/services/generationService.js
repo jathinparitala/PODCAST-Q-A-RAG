@@ -25,9 +25,51 @@ function getGenAIClient() {
   return genAI;
 }
 
-const NOT_FOUND_MSG = "I couldn't find enough information in the provided documents to answer this question.";
+const NOT_FOUND_MSG = "I couldn't find enough information in the uploaded document to answer this question.";
 
 const generationService = {
+  /**
+   * Helper to parse and extract distinct sub-questions from multi-question prompts
+   */
+  extractSubQuestions(questionText) {
+    if (!questionText || typeof questionText !== 'string') return [];
+    const text = questionText.trim();
+
+    // 1. Explicit numbered or bulleted items (e.g. "1. ... 2. ...", "Q1: ...", "- ...", "• ...")
+    const listItems = text.split(/(?:^|\n|\s+)(?:\d+[\.\)]|[a-zA-Z][\.\)]|Q\d+[:\.]|\-|•)\s+/i)
+      .map(s => s.trim())
+      .filter(s => s.length > 3);
+    if (listItems.length > 1) {
+      return listItems;
+    }
+
+    // 2. Multiple question marks (e.g. "What is RAG? What is chunking?")
+    const qmarkParts = text.split(/(?<=\?)\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 3);
+    if (qmarkParts.length > 1) {
+      return qmarkParts;
+    }
+
+    // 3. Newline-separated lines
+    const newlineParts = text.split(/\r?\n+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 3);
+    if (newlineParts.length > 1) {
+      return newlineParts;
+    }
+
+    // 4. Joined questions using "and what", "and how", "and why", "and tell me"
+    const clauseParts = text.split(/\s+and\s+(?=(?:what|how|why|where|who|which|tell|explain)\b)/i)
+      .map(s => s.trim())
+      .filter(s => s.length > 3);
+    if (clauseParts.length > 1) {
+      return clauseParts;
+    }
+
+    return [text];
+  },
+
   /**
    * Generate a grounded natural-language answer from retrieved chunks.
    *
@@ -45,11 +87,12 @@ const generationService = {
       };
     }
 
+    const subQuestions = this.extractSubQuestions(question);
     const hasApiKey = Boolean(config.aiApiKey && config.aiApiKey !== 'your_google_ai_api_key_here');
 
     if (hasApiKey) {
       try {
-        const result = await this._llmGenerate(question, retrievedChunks, conversationHistory);
+        const result = await this._llmGenerate(question, retrievedChunks, conversationHistory, subQuestions);
         if (result && result.answer) {
           return result;
         }
@@ -59,13 +102,13 @@ const generationService = {
     }
 
     // Use local NLP Synthesizer
-    return this._localSynthesize(question, retrievedChunks);
+    return this._localSynthesize(question, retrievedChunks, subQuestions);
   },
 
   /**
    * LLM Generation via Gemini API when configured
    */
-  async _llmGenerate(question, retrievedChunks, conversationHistory = []) {
+  async _llmGenerate(question, retrievedChunks, conversationHistory = [], subQuestions = []) {
     const contextBlocks = retrievedChunks.map((rc, idx) => {
       if (rc.sourceType === 'pdf') {
         return `[Source ${idx + 1}] (Document: ${rc.chunk.documentName || 'Document'}, Page: ${rc.chunk.pageNumber || 1})\n${rc.chunk.text}`;
@@ -75,15 +118,18 @@ const generationService = {
       }
     });
 
+    const multiQuestionRule = subQuestions.length > 1
+      ? `\n6. MULTI-QUESTION MANDATE: The user asked ${subQuestions.length} distinct questions. You MUST address and answer EVERY SINGLE question asked, using numbered points (1., 2., 3., etc.) corresponding to each question. Do NOT omit any question.`
+      : '';
+
     const systemPrompt = `You are a document and podcast transcript question-answering assistant.
 
 CRITICAL RULES:
 1. Answer the user's question ONLY using the provided retrieved context.
 2. Do NOT use outside or general knowledge.
 3. Do NOT hallucinate, assume, or invent facts not present in the context.
-4. If the provided context does NOT contain enough information to answer the question, your ENTIRE response MUST be EXACTLY:
-"${NOT_FOUND_MSG}"
-5. Do NOT list raw sources in your text body; sources, page numbers, and timestamps will be displayed separately below your answer.
+4. If the provided context does NOT contain enough information to answer a specific question, respond stating context was insufficient for that question.
+5. Do NOT list raw sources in your text body; sources, page numbers, and timestamps will be displayed separately below your answer.${multiQuestionRule}
 
 RETRIEVED CONTEXT:
 ${contextBlocks.join('\n\n')}`;
@@ -97,7 +143,7 @@ ${contextBlocks.join('\n\n')}`;
 
     const rawAnswer = result.response.text().trim();
 
-    if (!rawAnswer || rawAnswer.includes("couldn't find enough information") || rawAnswer.includes("does not contain enough information")) {
+    if (!rawAnswer || (subQuestions.length <= 1 && (rawAnswer.includes("couldn't find enough information") || rawAnswer.includes("does not contain enough information")))) {
       return {
         answer: NOT_FOUND_MSG,
         citedChunkIds: [],
@@ -113,21 +159,56 @@ ${contextBlocks.join('\n\n')}`;
   /**
    * Local NLP Synthesizer — extracts relevant statements & synthesizes natural-language answers
    */
-  _localSynthesize(question, retrievedChunks) {
+  _localSynthesize(question, retrievedChunks, subQuestions = []) {
     const contextText = retrievedChunks.map(rc => rc.chunk.text).join('\n\n');
 
-    // 1. Verify if sufficient context exists for the query topic
-    if (!this._hasSufficientContext(question, contextText, retrievedChunks)) {
+    if (!subQuestions || subQuestions.length <= 1) {
+      // 1. Verify if sufficient context exists for single query
+      if (!this._hasSufficientContext(question, contextText, retrievedChunks)) {
+        return {
+          answer: NOT_FOUND_MSG,
+          citedChunkIds: [],
+        };
+      }
+
+      // 2. Synthesize single grounded answer
+      const answer = this._synthesizeGroundedAnswer(question, retrievedChunks, contextText);
+
+      if (!answer || answer === NOT_FOUND_MSG) {
+        return {
+          answer: NOT_FOUND_MSG,
+          citedChunkIds: [],
+        };
+      }
+
       return {
-        answer: NOT_FOUND_MSG,
-        citedChunkIds: [],
+        answer,
+        citedChunkIds: retrievedChunks.map(rc => rc.chunk.id),
       };
     }
 
-    // 2. Synthesize answer based on query intent & retrieved chunks
-    const answer = this._synthesizeGroundedAnswer(question, retrievedChunks, contextText);
+    // 3. Multi-question synthesis loop
+    const answerParts = [];
+    let hasAnyValidAnswer = false;
 
-    if (!answer || answer === NOT_FOUND_MSG) {
+    for (let i = 0; i < subQuestions.length; i++) {
+      const subQ = subQuestions[i];
+      const hasCtx = this._hasSufficientContext(subQ, contextText, retrievedChunks);
+
+      if (!hasCtx) {
+        answerParts.push(`**${i + 1}. Question: "${subQ}"**\n${NOT_FOUND_MSG}`);
+      } else {
+        const subAns = this._synthesizeGroundedAnswer(subQ, retrievedChunks, contextText);
+        if (!subAns || subAns === NOT_FOUND_MSG) {
+          answerParts.push(`**${i + 1}. Question: "${subQ}"**\n${NOT_FOUND_MSG}`);
+        } else {
+          answerParts.push(`**${i + 1}. Question: "${subQ}"**\n${subAns}`);
+          hasAnyValidAnswer = true;
+        }
+      }
+    }
+
+    if (!hasAnyValidAnswer) {
       return {
         answer: NOT_FOUND_MSG,
         citedChunkIds: [],
@@ -135,7 +216,7 @@ ${contextBlocks.join('\n\n')}`;
     }
 
     return {
-      answer,
+      answer: answerParts.join('\n\n'),
       citedChunkIds: retrievedChunks.map(rc => rc.chunk.id),
     };
   },

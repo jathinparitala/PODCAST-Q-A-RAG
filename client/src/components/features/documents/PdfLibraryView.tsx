@@ -180,15 +180,15 @@ export const PdfLibraryView: React.FC<{
                   <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800 text-brand-600 dark:text-brand-400 shrink-0">
                     <FileText className="w-5 h-5" />
                   </div>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 ${
                     doc.status === 'ready' ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' :
                     doc.status === 'failed' ? 'bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800' :
                     'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                   }`}>
-                    {doc.status === 'ready' && <CheckCircle2 className="w-3.5 h-3.5" />}
-                    {doc.status === 'failed' && <AlertCircle className="w-3.5 h-3.5" />}
-                    {(doc.status === 'processing' || doc.status === 'pending') && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    <span className="capitalize">{doc.status}</span>
+                    {doc.status === 'ready' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
+                    {doc.status === 'failed' && <AlertCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />}
+                    {(doc.status === 'processing' || doc.status === 'pending') && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600 dark:text-amber-400" />}
+                    <span>{doc.status === 'ready' ? '✓ Ready' : doc.status === 'failed' ? 'Processing Failed' : 'Processing...'}</span>
                   </span>
                 </div>
 
@@ -196,33 +196,45 @@ export const PdfLibraryView: React.FC<{
                   {doc.fileName}
                 </h3>
 
-                <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mb-4">
-                  <span>{doc.pageCount > 0 ? `${doc.pageCount} pages` : 'Calculating pages...'}</span>
+                <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mb-3">
+                  <span>{doc.pageCount > 0 ? `${doc.pageCount} page${doc.pageCount !== 1 ? 's' : ''}` : 'Calculating pages...'}</span>
                   <span>•</span>
                   <span>{(doc.fileSize / 1024).toFixed(0)} KB</span>
                 </div>
 
+                {(doc.status === 'processing' || doc.status === 'pending') && (
+                  <div className="mt-2 mb-4 p-3 bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/80 rounded-xl">
+                    <div className="flex items-center justify-between text-xs text-amber-700 dark:text-amber-300 font-medium mb-1.5">
+                      <span>Extracting & Chunking PDF...</span>
+                      <span className="animate-pulse">Processing</span>
+                    </div>
+                    <div className="w-full bg-amber-200/60 dark:bg-amber-900/50 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-amber-500 h-1.5 rounded-full animate-pulse w-3/4" />
+                    </div>
+                  </div>
+                )}
+
                 {doc.status === 'failed' && (
-                  <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300 mb-4">
+                  <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-700 dark:text-red-300 mb-4">
                     <p className="font-semibold flex items-center gap-1.5 mb-1"><AlertCircle className="w-3.5 h-3.5" /> Processing Failed</p>
                     <p className="opacity-90">{doc.errorMessage || 'Scanned or unreadable PDF file format.'}</p>
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 gap-2">
+              <div className="flex items-center justify-between pt-3.5 border-t border-slate-100 dark:border-slate-800 gap-2 mt-2">
                 <Button
                   variant="primary" size="sm"
                   disabled={doc.status !== 'ready'}
                   onClick={() => onStartChatForDocument(doc.id, doc.fileName)}
                   className="gap-1.5 flex-1"
                 >
-                  <MessageSquare className="w-3.5 h-3.5" /> Start PDF Q&A
+                  <MessageSquare className="w-3.5 h-3.5" /> Ask Questions
                 </Button>
                 <button
                   onClick={() => handleDeleteDocument(doc.id, doc.fileName)}
                   disabled={deletingId === doc.id}
-                  className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
                   title="Delete Document"
                 >
                   {deletingId === doc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}

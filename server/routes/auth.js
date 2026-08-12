@@ -13,18 +13,19 @@ const rateLimiter = require('../middleware/rateLimiter');
 function setAuthCookies(res, tokens, rememberMe = false) {
   const maxAgeAccess = 15 * 60 * 1000; // 15 minutes
   const maxAgeRefresh = (rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000;
+  const isProd = process.env.NODE_ENV === 'production';
 
   res.cookie('access_token', tokens.accessToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
     maxAge: maxAgeAccess
   });
 
   res.cookie('refresh_token', tokens.refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
     maxAge: maxAgeRefresh
   });
 }

@@ -122,22 +122,26 @@ export interface Conversation {
 // ─── Request Helper ───────────────────────────────────────────────────────────
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const defaultHeaders: HeadersInit = {
+  const token = localStorage.getItem('access_token');
+  const defaultHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
   };
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`;
+  }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: {
       ...defaultHeaders,
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     },
-    credentials: 'same-origin',
+    credentials: 'include',
   });
 
   let data: any = {};
   const text = await response.text();
-  if (text) {
+  if (text && text.trim().length > 0) {
     try {
       data = JSON.parse(text);
     } catch (e) {
@@ -146,10 +150,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   if (!response.ok) {
-    const errorMsg = data.error?.message || response.statusText || 'An unexpected error occurred.';
+    const errorMsg = data.error?.message || data.message || response.statusText || `HTTP ${response.status} Error`;
     const error = new Error(errorMsg) as Error & { statusCode?: number; code?: string };
     error.statusCode = response.status;
-    error.code = data.error?.code;
+    error.code = data.error?.code || data.code;
     throw error;
   }
 
@@ -160,9 +164,20 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 export const api = {
   // Auth
-  register: (body: any) => request<{ success: boolean; user: User; verificationToken?: string }>('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
-  login: (body: any) => request<{ success: boolean; user: User }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
-  logout: () => request<{ success: boolean }>('/auth/logout', { method: 'POST' }),
+  register: async (body: any) => {
+    const res = await request<{ success: boolean; user: User; token?: string }>('/auth/register', { method: 'POST', body: JSON.stringify(body) });
+    if (res.token) localStorage.setItem('access_token', res.token);
+    return res;
+  },
+  login: async (body: any) => {
+    const res = await request<{ success: boolean; user: User; token?: string }>('/auth/login', { method: 'POST', body: JSON.stringify(body) });
+    if (res.token) localStorage.setItem('access_token', res.token);
+    return res;
+  },
+  logout: async () => {
+    localStorage.removeItem('access_token');
+    return request<{ success: boolean }>('/auth/logout', { method: 'POST' });
+  },
   getMe: () => request<{ success: boolean; user: User }>('/auth/me'),
   verifyEmail: (token: string) => request<{ success: boolean; message: string }>('/auth/verify-email', { method: 'POST', body: JSON.stringify({ token }) }),
   forgotPassword: (email: string) => request<{ success: boolean; resetToken?: string; message: string }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),

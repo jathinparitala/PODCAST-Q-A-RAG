@@ -47,19 +47,45 @@ const ragOrchestrationService = {
     }
 
     try {
-      // 2. Embed the user's question
-      const queryEmbedding = await embeddingService.generateEmbedding(question);
+      // 2. Extract sub-questions & perform unified retrieval
+      const subQuestions = generationService.extractSubQuestions(question);
+      let retrievedChunks = [];
 
-      // 3. Retrieve relevant chunks (Unified vector + keyword search)
-      const retrievalOptions = {
-        sourceType,
-        episodeId,
-        documentId,
-        userId,
-        queryText: question,
-        topK: 5,
-      };
-      const retrievedChunks = retrievalService.retrieveRelevantChunks(queryEmbedding, retrievalOptions);
+      if (subQuestions.length > 1) {
+        logger.info(`Multi-question query detected (${subQuestions.length} sub-questions). Performing multi-vector retrieval.`);
+        const chunkMap = new Map();
+
+        for (const subQ of subQuestions) {
+          const subEmbedding = await embeddingService.generateEmbedding(subQ);
+          const subChunks = retrievalService.retrieveRelevantChunks(subEmbedding, {
+            sourceType,
+            episodeId,
+            documentId,
+            userId,
+            queryText: subQ,
+            topK: 5,
+          });
+
+          for (const rc of subChunks) {
+            const existing = chunkMap.get(rc.chunk.id);
+            if (!existing || rc.score > existing.score) {
+              chunkMap.set(rc.chunk.id, rc);
+            }
+          }
+        }
+
+        retrievedChunks = Array.from(chunkMap.values()).sort((a, b) => b.score - a.score);
+      } else {
+        const queryEmbedding = await embeddingService.generateEmbedding(question);
+        retrievedChunks = retrievalService.retrieveRelevantChunks(queryEmbedding, {
+          sourceType,
+          episodeId,
+          documentId,
+          userId,
+          queryText: question,
+          topK: 5,
+        });
+      }
 
       // 4. Load recent conversation history for context
       const recentMessages = db.all(`
